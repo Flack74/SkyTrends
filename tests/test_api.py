@@ -52,7 +52,9 @@ class TestAPI(unittest.TestCase):
     def test_fetch_api_data_error(self, mock_get):
         """Test API error handling."""
         # Mock error response
-        mock_get.side_effect = Exception("API Error")
+        mock_response = MagicMock()
+        mock_response.raise_for_status.side_effect = Exception("API Error")
+        mock_get.return_value = mock_response
 
         # Call function
         result = fetch_api_data("JFK", "LAX", "2023-07-15", "2023-07-22")
