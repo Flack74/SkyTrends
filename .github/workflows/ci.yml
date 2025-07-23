@@ -23,5 +23,8 @@ jobs:
       run: |
         black --check .
     - name: Test with pytest
+      env:
+        API_KEY: demo
+        AI_KEY: demo
       run: |
         pytest
