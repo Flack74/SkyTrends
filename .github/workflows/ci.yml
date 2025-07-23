@@ -28,4 +28,4 @@ jobs:
         API_KEY: demo
         AI_KEY: demo
       run: |
-        python -m pytest -v
+        cd $GITHUB_WORKSPACE && python -m pytest
