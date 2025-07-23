@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Airline Demand Analysis - Results{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">Flight Demand Analysis Results</h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>Search Parameters</h4>
+                        <ul class="list-group">
+                            <li class="list-group-item">
+                                <strong>Origin:</strong> {{ origin }}
+                                {% set origin_airport = get_airport_by_code(origin) %}
+                                {% if origin_airport %}
+                                <div class="text-muted small">{{ origin_airport.name }}, {{ origin_airport.city }}, {{ origin_airport.country }}</div>
+                                {% endif %}
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Destination:</strong> {{ destination }}
+                                {% if destination != "ANY" %}
+                                    {% set dest_airport = get_airport_by_code(destination) %}
+                                    {% if dest_airport %}
+                                    <div class="text-muted small">{{ dest_airport.name }}, {{ dest_airport.city }}, {{ dest_airport.country }}</div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="text-muted small">All destinations</div>
+                                {% endif %}
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Date Range:</strong> {{ start_date|default('N/A') }} to {{ end_date|default('N/A') }}
+                            </li>
+                            <li class="list-group-item">
+                                <strong>Data Source:</strong> 
+                                <span class="badge {% if 'API' in data_source %}bg-success{% else %}bg-warning{% endif %}">
+                                    {{ data_source|default('Generated data') }}
+                                </span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Summary Statistics</h4>
+                        <ul class="list-group">
+                            <li class="list-group-item"><strong>Total Routes Analyzed:</strong> {{ results.summary.total_routes }}</li>
+                            <li class="list-group-item"><strong>Average Price:</strong> ${{ results.summary.avg_price }}</li>
+                            <li class="list-group-item"><strong>Price Range:</strong> ${{ results.summary.min_price }} - ${{ results.summary.max_price }}</li>
+                            <li class="list-group-item">
+                                <strong>Price Volatility:</strong>
+                                {% set volatility = (results.summary.max_price - results.summary.min_price) / results.summary.avg_price * 100 if results.summary.avg_price > 0 else 0 %}
+                                {{ volatility|round(1) }}%
+                                {% if volatility > 50 %}
+                                    <span class="badge bg-danger">High</span>
+                                {% elif volatility > 25 %}
+                                    <span class="badge bg-warning">Medium</span>
+                                {% else %}
+                                    <span class="badge bg-success">Low</span>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h3 class="mb-0">Top Routes by Demand</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="routesChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h3 class="mb-0">Price Trends Over Time</h3>
+            </div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-warning text-white">
+                <h3 class="mb-0">Market Insights</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Price Trend Analysis</h5>
+                        <ul class="list-group">
+                            {% if results.price_trends|length > 1 %}
+                                {% set first_price = results.price_trends[0].price %}
+                                {% set last_price = results.price_trends[-1].price %}
+                                {% set price_change = ((last_price - first_price) / first_price * 100) if first_price > 0 else 0 %}
+                                <li class="list-group-item">
+                                    <strong>Price Trend:</strong>
+                                    {% if price_change > 5 %}
+                                        <span class="text-danger">Increasing</span> ({{ price_change|round(1) }}% over period)
+                                    {% elif price_change < -5 %}
+                                        <span class="text-success">Decreasing</span> ({{ price_change|abs|round(1) }}% over period)
+                                    {% else %}
+                                        <span class="text-info">Stable</span> ({{ price_change|round(1) }}% change)
+                                    {% endif %}
+                                </li>
+                            {% endif %}
+                            <li class="list-group-item">
+                                <strong>Best Day to Book:</strong>
+                                {% if results.price_trends|length > 0 %}
+                                    {% set min_price_day = results.price_trends|sort(attribute='price')|first %}
+                                    {{ min_price_day.depart_date }} (${{ min_price_day.price }})
+                                {% else %}
+                                    No data available
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Route Popularity</h5>
+                        <ul class="list-group">
+                            {% if results.top_routes|length > 0 %}
+                                <li class="list-group-item">
+                                    <strong>Most Popular Route:</strong>
+                                    {% set top_route = results.top_routes|first %}
+                                    {{ top_route.origin }} to {{ top_route.destination }} ({{ top_route.count }} flights)
+                                </li>
+                                <li class="list-group-item">
+                                    <strong>Market Competition:</strong>
+                                    {% set route_count = results.top_routes|length %}
+                                    {% if route_count > 5 %}
+                                        <span class="text-success">High</span> ({{ route_count }} different routes)
+                                    {% elif route_count > 2 %}
+                                        <span class="text-warning">Medium</span> ({{ route_count }} different routes)
+                                    {% else %}
+                                        <span class="text-danger">Low</span> ({{ route_count }} different routes)
+                                    {% endif %}
+                                </li>
+                            {% else %}
+                                <li class="list-group-item">No route data available</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h3 class="mb-0">Detailed Route Data</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Origin</th>
+                                <th>Destination</th>
+                                <th>Count</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if results.top_routes %}
+                                {% for route in results.top_routes %}
+                                <tr>
+                                    <td>{{ route.origin }}</td>
+                                    <td>{{ route.destination }}</td>
+                                    <td>{{ route.count }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="3" class="text-center">No route data available</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-grid gap-2 col-md-6 mx-auto mt-4">
+    <div class="row">
+        <div class="col-6">
+            <a href="/" class="btn btn-primary w-100">New Search</a>
+        </div>
+        <div class="col-6">
+            <button onclick="window.print()" class="btn btn-outline-secondary w-100">
+                <i class="bi bi-printer"></i> Print Report
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Data for charts
+        const routesData = JSON.parse('{{ results.top_routes|tojson|safe }}');
+        const priceData = JSON.parse('{{ results.price_trends|tojson|safe }}');
+        
+        // Check if we have data to display
+        const hasRouteData = routesData && routesData.length > 0;
+        const hasPriceData = priceData && priceData.length > 0;
+        
+        // Top Routes Chart
+        const routesCtx = document.getElementById('routesChart').getContext('2d');
+        
+        if (!hasRouteData) {
+            // Display a message when no route data is available
+            const noDataMsg = document.createElement('div');
+            noDataMsg.className = 'alert alert-info text-center';
+            noDataMsg.textContent = 'No route data available';
+            routesCtx.canvas.parentNode.appendChild(noDataMsg);
+            routesCtx.canvas.style.display = 'none';
+        } else {
+            new Chart(routesCtx, {
+                type: 'bar',
+                data: {
+                    labels: routesData.map(item => `${item.origin}-${item.destination}`),
+                    datasets: [{
+                        label: 'Number of Flights',
+                        data: routesData.map(item => item.count),
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Count'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Route'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Price Trends Chart
+        const priceCtx = document.getElementById('priceChart').getContext('2d');
+        
+        if (!hasPriceData) {
+            // Display a message when no price data is available
+            const noDataMsg = document.createElement('div');
+            noDataMsg.className = 'alert alert-info text-center';
+            noDataMsg.textContent = 'No price trend data available';
+            priceCtx.canvas.parentNode.appendChild(noDataMsg);
+            priceCtx.canvas.style.display = 'none';
+        } else {
+            new Chart(priceCtx, {
+                type: 'line',
+                data: {
+                    labels: priceData.map(item => item.depart_date),
+                    datasets: [{
+                        label: 'Average Price ($)',
+                        data: priceData.map(item => item.price),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Price ($)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Date'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

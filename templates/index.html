@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Airline Demand Analysis - Search{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">Search Flight Demand</h2>
+            </div>
+            <div class="card-body">
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                
+                <form action="/results" method="post">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="origin" class="form-label">Origin Airport*</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="origin_search" 
+                                       placeholder="Search by city, airport name or code" autocomplete="off">
+                                <input type="hidden" id="origin" name="origin" required>
+                            </div>
+                            <div id="origin_results" class="airport-results"></div>
+                            <div class="form-text">Select an airport from the dropdown</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="destination" class="form-label">Destination Airport</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="destination_search" 
+                                       placeholder="Search or type ANY for all destinations" autocomplete="off">
+                                <input type="hidden" id="destination" name="destination">
+                            </div>
+                            <div id="destination_results" class="airport-results"></div>
+                            <div class="form-text">Select an airport or type "ANY" for all destinations</div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="start_date" class="form-label">Start Date*</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="end_date" class="form-label">End Date*</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" required>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" id="submit-btn" class="btn btn-primary">
+                            <span id="btn-text">Analyze Demand</span>
+                            <span id="loading-spinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h3 class="mb-0">About This Tool</h3>
+            </div>
+            <div class="card-body">
+                <p>This application helps analyze airline booking market demand by showing:</p>
+                <ul>
+                    <li>Popular routes based on search frequency</li>
+                    <li>Price trends over your selected date range</li>
+                    <li>High-demand periods and pricing insights</li>
+                    <li>AI-powered analysis of travel patterns and recommendations</li>
+                </ul>
+                <p>Enter your search criteria above to get started.</p>
+            </div>
+        </div>
+        
+        <div class="card mt-4 ai-card">
+            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                <h3 class="mb-0"><i class="bi bi-robot"></i> AI Travel Assistant</h3>
+                <span class="badge bg-light text-success">Powered by Qwen</span>
+            </div>
+            <div class="card-body">
+                <p class="text-muted"><i class="bi bi-info-circle"></i> Ask questions about routes, prices, travel tips, or flight options</p>
+                <div class="input-group mb-3">
+                    <span class="input-group-text bg-light"><i class="bi bi-search"></i></span>
+                    <input type="text" id="ai-question" class="form-control" placeholder="E.g., What's the best time to fly from New York to London?">
+                    <button class="btn btn-success" type="button" id="ask-ai-btn">
+                        <i class="bi bi-send"></i> Ask
+                    </button>
+                </div>
+                <div id="ai-response" class="chat-container" style="display: none;">
+                    <div id="ai-thinking" class="text-center p-4">
+                        <div class="spinner-grow text-success" role="status" style="width: 1.5rem; height: 1.5rem;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="spinner-grow text-success mx-2" role="status" style="width: 1.5rem; height: 1.5rem; animation-delay: 0.2s;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <div class="spinner-grow text-success" role="status" style="width: 1.5rem; height: 1.5rem; animation-delay: 0.4s;">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-3 text-muted">Analyzing travel data and generating insights...</p>
+                    </div>
+                    <div id="ai-answer" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+            /* AI Assistant Styling - ChatGPT/Perplexity Style */
+            .ai-card {
+                box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+                border: none;
+            }
+            
+            .chat-container {
+                background-color: #ffffff;
+                border-radius: 8px;
+                padding: 20px;
+                max-height: 500px;
+                overflow-y: auto;
+                border: 1px solid #e9ecef;
+            }
+            
+            .ai-question {
+                background-color: #f0f7ff;
+                padding: 12px 16px;
+                border-radius: 8px;
+                margin-bottom: 16px;
+                font-weight: 500;
+                color: #333;
+            }
+            
+            .ai-answer {
+                line-height: 1.6;
+                padding: 0;
+                font-size: 15px;
+                color: #333;
+            }
+            
+            .ai-answer h3, .ai-answer h4, .ai-answer h5 {
+                margin-top: 24px;
+                margin-bottom: 12px;
+                color: #333;
+                font-weight: 600;
+            }
+            
+            .ai-answer p {
+                margin-bottom: 16px;
+                line-height: 1.6;
+            }
+            
+            .ai-answer strong {
+                color: #333;
+                font-weight: 600;
+            }
+            
+            .ai-answer hr {
+                margin: 20px 0;
+                border-color: #eaeaea;
+                opacity: 0.5;
+            }
+            
+            /* List styling - ChatGPT style */
+            .ai-list {
+                margin-bottom: 16px;
+                padding-left: 20px;
+            }
+            
+            .ai-list li {
+                margin-bottom: 8px;
+                line-height: 1.6;
+            }
+            
+            /* Focus styling */
+            #ai-question:focus {
+                box-shadow: 0 0 0 2px rgba(25, 135, 84, 0.25);
+                border-color: #198754;
+            }
+            
+            /* Icons styling */
+            .ai-answer i.bi {
+                margin: 0 2px;
+                vertical-align: middle;
+            }
+            
+            /* Date styling */
+            .travel-date {
+                display: inline-block;
+                background-color: #f8f9fa;
+                border-radius: 4px;
+                padding: 2px 6px;
+                font-size: 0.9em;
+                color: #666;
+                margin: 0 2px;
+                border: 1px solid #dee2e6;
+            }
+            
+            .text-success {
+                color: #198754;
+            }
+            
+            .text-warning {
+                color: #ffc107;
+            }
+            
+            /* Mobile responsiveness */
+            @media (max-width: 576px) {
+                .ai-answer {
+                    font-size: 14px;
+                }
+                
+                .chat-container {
+                    padding: 15px;
+                }
+            }
+        </style>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .airport-results {
+        position: absolute;
+        z-index: 1000;
+        background: white;
+        width: 100%;
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid #ced4da;
+        border-radius: 0.25rem;
+        display: none;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .airport-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid #f0f0f0;
+    }
+    .airport-item:hover {
+        background-color: #f8f9fa;
+    }
+    .airport-code {
+        font-weight: bold;
+        color: #0d6efd;
+    }
+    .airport-name {
+        font-size: 0.9em;
+    }
+    .airport-location {
+        font-size: 0.8em;
+        color: #6c757d;
+    }
+</style>
+<script>
+    // Set default dates (today and 30 days from now)
+    document.addEventListener('DOMContentLoaded', function() {
+        // AI Assistant functionality
+        document.getElementById('ask-ai-btn').addEventListener('click', function() {
+            const question = document.getElementById('ai-question').value.trim();
+            if (!question) return;
+            
+            const aiResponse = document.getElementById('ai-response');
+            const aiThinking = document.getElementById('ai-thinking');
+            const aiAnswer = document.getElementById('ai-answer');
+            
+            aiResponse.style.display = 'block';
+            aiThinking.style.display = 'block';
+            aiAnswer.innerHTML = '';
+            
+            // Call the AI API endpoint
+            fetch('/ask_ai', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ question: question })
+            })
+            .then(response => response.json())
+            .then(data => {
+                aiThinking.style.display = 'none';
+                aiAnswer.innerHTML = data.response;
+            })
+            .catch(error => {
+                aiThinking.style.display = 'none';
+                aiAnswer.innerHTML = '<div class="alert alert-danger">Sorry, there was an error processing your question. Please try again later.</div>';
+                console.error('Error:', error);
+            });
+        });
+        
+        // Enter key for AI question input
+        document.getElementById('ai-question').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('ask-ai-btn').click();
+            }
+        });
+        // Show loading indicator when form is submitted
+        document.querySelector('form').addEventListener('submit', function() {
+            document.getElementById('btn-text').textContent = 'Analyzing...';
+            document.getElementById('loading-spinner').classList.remove('d-none');
+            document.getElementById('submit-btn').disabled = true;
+        });
+        const today = new Date();
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(today.getDate() + 30);
+        
+        document.getElementById('start_date').valueAsDate = today;
+        document.getElementById('end_date').valueAsDate = thirtyDaysLater;
+        
+        // Airport search functionality
+        setupAirportSearch('origin');
+        setupAirportSearch('destination');
+        
+        // Allow "ANY" for destination
+        document.getElementById('destination_search').addEventListener('input', function(e) {
+            if (e.target.value.toUpperCase() === 'ANY') {
+                document.getElementById('destination').value = 'ANY';
+                document.getElementById('destination_results').style.display = 'none';
+            }
+        });
+    });
+    
+    function setupAirportSearch(fieldName) {
+        const searchField = document.getElementById(fieldName + '_search');
+        const resultsDiv = document.getElementById(fieldName + '_results');
+        const hiddenField = document.getElementById(fieldName);
+        
+        searchField.addEventListener('input', function() {
+            const query = this.value.trim();
+            
+            if (query.length < 2) {
+                resultsDiv.style.display = 'none';
+                return;
+            }
+            
+            // Special case for "ANY" in destination
+            if (fieldName === 'destination' && query.toUpperCase() === 'ANY') {
+                hiddenField.value = 'ANY';
+                return;
+            }
+            
+            fetch('/search_airport?q=' + encodeURIComponent(query))
+                .then(response => response.json())
+                .then(data => {
+                    resultsDiv.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        resultsDiv.style.display = 'none';
+                        return;
+                    }
+                    
+                    data.forEach(airport => {
+                        const item = document.createElement('div');
+                        item.className = 'airport-item';
+                        item.innerHTML = `
+                            <div class="airport-code">${airport.code}</div>
+                            <div class="airport-name">${airport.name}</div>
+                            <div class="airport-location">${airport.city}, ${airport.country}</div>
+                        `;
+                        
+                        item.addEventListener('click', function() {
+                            searchField.value = `${airport.code} - ${airport.city}`;
+                            hiddenField.value = airport.code;
+                            resultsDiv.style.display = 'none';
+                        });
+                        
+                        resultsDiv.appendChild(item);
+                    });
+                    
+                    resultsDiv.style.display = 'block';
+                });
+        });
+        
+        // Hide results when clicking outside
+        document.addEventListener('click', function(e) {
+            if (e.target !== searchField && e.target !== resultsDiv) {
+                resultsDiv.style.display = 'none';
+            }
+        });
+    }
+</script>
+{% endblock %}
