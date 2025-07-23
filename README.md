@@ -8,7 +8,8 @@
 
 SkyTrends is a powerful, lightweight analytics platform that provides real-time insights into airline booking market demand. Built for hostel operators across Australia, it helps identify popular routes, track price fluctuations, and discover high-demand travel periods to optimize business decisions.
 
-![SkyTrends Dashboard](https://via.placeholder.com/800x400?text=SkyTrends+Dashboard)
+### SkyTrends Dashboard
+<img width="1854" height="856" alt="image" src="https://github.com/user-attachments/assets/1f1f6615-a7cf-4824-ab2b-53a35e09674e" />
 
 ## ✨ Key Features
 
