@@ -3,12 +3,9 @@
 # Created: 2023-07-01
 # Author: Developer
 
-import sys
-import os
 import unittest
 
-# Add parent directory to path to import app
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Import the function to test
 from app import analyze
 
 
